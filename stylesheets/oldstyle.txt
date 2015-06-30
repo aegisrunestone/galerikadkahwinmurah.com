@@ -1,0 +1,45 @@
+body {
+	background-color: #ece4d8;
+	font-family: 'Open Sans';
+}
+
+.grid-container {
+	padding:10px;
+}
+
+.grid-item {
+}
+
+.gutter {
+	padding: 5px;
+}
+
+.grid-item-text {
+	padding: 10px;
+}
+
+.sold-by .float-container img{
+	margin-right: 10px;
+}
+
+.float-left {
+	float: left;
+}
+
+@media (max-width:480px) {
+	.grid-item {
+		width: 100%;
+	}
+}
+
+@media (min-width:480px) and (max-width:1024px) {
+	.grid-item {
+		width: 50%;
+	}
+}
+
+@media (min-width:1024px) {
+	.grid-item {
+		width: 25%;
+	}
+}
