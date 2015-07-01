@@ -11,78 +11,258 @@
 	<meta property="og:description" content="Dapatkan kad kahwin murah dari kedai yang tersenarai seluruh malaysia secara online. Design kad jemputan kahwin terbaru dan trendy.">
     <link rel="stylesheet" href="stylesheets/core.css">
     <link rel="stylesheet" href="stylesheets/style.css">
-
+	<link href='http://fonts.googleapis.com/css?family=Roboto:700,400,300' rel='stylesheet' type='text/css'>
     <script type="text/javascript" src="javascripts/modernizr.js"></script>
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
     <script type="text/javascript" src="javascripts/isotope.pkgd.min.js"></script>
     <script type="text/javascript" src="javascripts/template.js"></script>
     <script type="text/javascript" src="javascripts/main.js"></script>
+	<!--
+	<select id="price-list-select">&#9660;
+				<% var pl = data["price_list"]; console.log(pl.hasOwnProperty); for (var quantity in pl) { if (pl.hasOwnProperty(quantity)) { %>
+					<option value="<%= pl[quantity] %>"><%= quantity%></option>
+				<% } } %>
+			</select>-->
     
 	
+	<script type="text/html" id="popup_product_template">
+		
+	</script>
+	
 	<script type="text/html" id="article_template">
-		<% for (var key in data) {
-		   if (data.hasOwnProperty(key)) {
-			   var obj = data[key];
-            
-          		%>
-		<article class="grid-item">
+		<%
+		var isq = !(typeof req_quantity == "undefined");
+		var key = data.uuid;
+           %>
+		<article class="grid-item" id="<%=key%>">
 		<div class="gutter">
 		<div class="grid-item-content">
-			<header>
+			<header class="grid-image-and-overlay-container">
 			<div class="grid-main-image-container"><img src="images/<%= key%>.jpg" style=""></div>
+			<div class="grid-main-image-overlay"></div>
 			</header>
 			<section class="grid-item-text">
-			<p class="product-name"><%= key%></p>
-			<p class="product-price">RM <%= obj["price_list"]["50"] %></p>
+			<p class="product-name"><%= data.title%></p>
+			<% if (!isq) { %>
+				<div class="price-container">
+				<p class="product-price"><b>RM <%= data["price"][0].toFixed(2) %></b></p>
+				<p class="product-min-order"><b>Minimum: <%= data["quantity"][0] %> pcs </b></p>
+			<% } else { 
+			
+				var idx = req_quantity;
+				var issame = (quantities[idx] == data["quantity"][idx]);
+				var ismore = (quantities[idx] < data["quantity"][idx]);
+				var flag = ((issame) ? "same" : ((ismore) ? "more" : "less"));
+				
+			%>
+				<div class="price-container" title="<%= (flag != "same") ? "No exact match for requested quantity" : ""%>">
+				<p class="product-price <%= flag%>"><b>RM <%= data["price"][idx].toFixed(2) %></b></p>
+				<p class="product-min-order <%= flag%>"><b><%= (idx == 0) ? "Minimum: " : ""%><%= data["quantity"][idx] %> pcs</b></p>
+			<% 
+			} %>
+			<div class="clearfix"></div>
+			</div>
+			<div class="price-table-container">
+				<table class="price-table">
+					<thead>
+						<th>Quantity</th>
+						<th>Price/pcs</th>
+					</thead>
+					<% var pl = data["price"]; for (var i = 0; i < pl.length; i++) { %>
+					<tr><td class="quantity"><%= data["quantity"][i]%></td><td class="price">RM <%= pl[i].toFixed(2) %></td></tr>
+					<% } %>
+				</table>
+			</div>
 			</section>
 			<footer>
 				<div class="sold-by">
 					<div class="float-container"><div class="float-left"><img src="images/sweetkad.jpg" style=""></div></div>
 					<h3 class="sold-by-text">Sold by</h3>
-					<p class="sold-by-whom">Sweetkad</p>
+					<p class="sold-by-whom"><a class="sold-by-link" target="_blank" href="<%= data["sold_by"]["link"]%>"><%= data["sold_by"]["name"]%></a></p>
 				</div>
 				
 			</footer>
 		</div>
 		</div>
 		</article>
-		<% }
-       }
-     %>
+		
 	</script>
 	
 	<script type="text/javascript">
 	
-	function createdom(data) {
-		//var grid = document.getElementsByClassName('grid')[0];
-		//grid.innerHTML += 
-		return tmpl('article_template',{data:data});
-	}
-      $(document).ready(function () {
+	var quantities = [50, 100, 250, 500, 750, 1000, 1250, 1500, 2000];
+	var current_query = 0;
+	var sorted = [];
+	var last_load_index = 0;
+	var $iso;
+	var maxload = 20;
 	
-        /*$('.grid').isotope({
-			percentPosition: true,
-			itemSelector: '.grid-item',
-			isResizeBound: true
-		});*/
-		//$it = $(createdom())
-		//$('.grid').append($it).isotope('appended',$it);
+	/* From http://stackoverflow.com/questions/3898130/how-to-check-if-a-user-has-scrolled-to-the-bottom#answer-15382570 */
+	var _throttleTimer = null;
+	var _throttleDelay = 100;
+	var $window = $(window);
+	var $document = $(document);
+	
+	/* From http://stackoverflow.com/questions/8584902/get-closest-number-out-of-array */
+	function closest(arr, target) {
+    if (!(arr) || arr.length == 0)
+        return null;
+    if (arr.length == 1)
+        return i[0];
+
+    for (var i=1; i<arr.length; i++) {
+        // As soon as a number bigger than target is found, return the previous or current
+        // number depending on which has smaller difference to the target.
+        if (arr[i] > target) {
+            var p = arr[i-1];
+            var c = arr[i]
+            return Math.abs( p-target ) < Math.abs( c-target ) ? p : c;
+        }
+    }
+    // No number in array is bigger so return the last.
+    return arr[arr.length-1];
+	}
+	
+	function sort(quantity_idx) {
+		sorted = $.map(quad, function(v){return v;});
+		sorted.sort(
+			firstBy(function(a,b){return a.price[quantity_idx] - b.price[quantity_idx];})
+			.thenBy('uuid')
+		);
+	}
+	
+	function load_cards() {
+	var to_load = [];
+	sort(current_query);
+	
+	$.each(sorted, function(idx,i){
+		to_load.push(tmpl('article_template',{data:i, req_quantity: current_query}));
+		if (idx == maxload) { last_load_index = idx; return false; }
+	});
+	
+	if (typeof $iso != 'undefined') {
+		$iso.isotope('remove',$('.grid-item'));
+		$it = $(to_load.join(''));
+		$('.grid').append($it);
+		$iso.isotope('appended', $it).isotope('layout');
+		
+	}
+	else {
+		$it = $(to_load.join(''));
+		$iso = $('.grid').append($it).isotope({
+		percentPosition: true,
+		itemSelector: '.grid-item',
+		isResizeBound: true
+		});
+	}
+	
+	}
+	
+	function load_more_cards() {
+		if ((typeof $iso == "undefined") || (last_load_index >= sorted.length)) return false;
+		
+		var to_load = [];
+		var last_idx = last_load_index+maxload;
+		
+		$.each(sorted.slice(last_load_index+1,last_idx) , function(idx,i){
+			to_load.push(tmpl('article_template',{data:i, req_quantity: current_query}));
+			last_load_index++;
+		});
+		$it = $(to_load.join(''));
+		$('.grid').append($it);
+		$iso.isotope('appended', $it).isotope('layout');
+	}
+	
+	function ScrollHandler(e) {
+    //throttle event:
+    clearTimeout(_throttleTimer);
+    _throttleTimer = setTimeout(function () {
+        console.log('scroll');
+
+        //do work
+        if ($window.scrollTop() + $window.height() > $document.height() - 200) {
+            //console.log("near bottom!");
+			setTimeout(load_more_cards,500);
+        }
+
+    }, _throttleDelay);
+	}
+	
+      $(document).ready(function () {
+		
+		$window
+        .off('scroll', ScrollHandler)
+        .on('scroll', ScrollHandler);
+		
+		$('.grid').on('click', '.grid-item-text .price-container', function(){
+			var $t = $(this);
+			$t.siblings('.price-table-container').slideToggle(0,function(){
+				$('.grid').isotope('layout');
+			});
+			ga('send', 'event', 'Toggle price table', 'click', $t.parents('.grid-item').attr('id')+' : '+$t.children('.product-price').text()+' : '+$t.children('.product-min-order').text(), 1);
+		});
+		
+		$('.grid').on('click', '.sold-by-whom .sold-by-link', function(){
+			ga('send', 'event', 'Out link', 'click', $(this).attr('href')+' (front)', 1);
+		});
+		
+		$('.grid').on('click','.grid-image-and-overlay-container', function(){
+			popup(true);
+			fill_popup(quad[$(this).parents('.grid-item').attr('id')]);
+		});
+		
+		$('#quantity_amount').on('change', function(){
+			//$('.grid-item').remove();
+			
+			current_query = quantities.indexOf(parseInt($(this).val()));
+			load_cards();
+			
+			ga('send', 'event', 'Select quantity', 'select', $(this).val()+' : '+$(this).children('option:selected').text(), 1);
+		});
+		
+		
 		
 		$.getJSON('javascripts/quad.json', function(d){
 			quad = d;
-			$it = $(createdom(quad));
+			load_cards();
 			
-			$('.grid').append($it).isotope({
-			percentPosition: true,
-			itemSelector: '.grid-item',
-			isResizeBound: true
-			});
 			//$('.grid').append($it).isotope('appended',$it);
 		})
+		
+		$('.popup').on('click',function(e){
+			if (e.target == this) popup(false);
+		})
       })
+	  
+	  function popup(bool) {
+		if (bool) {
+			$('.popup').addClass('show');
+			$('body').addClass('no-scroll');
+		} else {	
+			$('.popup').removeClass('show');
+			$('body').removeClass('no-scroll');
+		}
+	  }
+	  
+	  function fill_popup(d) {
+		var tablehtml = $('#'+d.uuid+' .price-table-container .price-table').html();
+		$('#popup_pricing_table').html(tablehtml);
+	  }
+	  
     </script>
 	
-    <title>Kad Kahwin Murah | Dapatkan kad jemputan kahwin murah secara online dari seluruh Malaysia</title>
+    <title>Kad Kahwin Murah | Galeri kad jemputan kahwin murah online</title>
+	
+	<script>
+	  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsdataect']=r;i[r]=i[r]||function(){
+	  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+	  ga('create', 'UA-64710043-1', 'auto');
+	  ga('send', 'pageview');
+
+	</script>
   </head>
 
   <body>
@@ -90,8 +270,21 @@
 
       <header>
 		<div class="logo-container" style="background:#ffffff; text-align:center; padding:10px;"><img src="images/heartlogowithtext.png"/></div>
-      </header>
-		<section>
+		<div class="">
+			Amaun: <select id="quantity_amount">
+			<option value="50">50</option>
+			<option value="100">100</option>
+			<option value="250">250</option>
+			<option value="500">500</option>
+			<option value="750">750</option>
+			<option value="1000">1000</option>
+			<option value="1250">1250</option>
+			<option value="1500">1500</option>
+			<option value="2000">2000</option>
+			</select>
+		</div>
+	  </header>
+		<section class="main-container">
 			<div class="grid-container">
 			<div class="grid">
 				<!--<article class="grid-item">
@@ -118,20 +311,27 @@
 			</div>
 			</div>
 		</section>
+		
+		<div class="popup-container">
+			<div class="popup">
+			<div class="margin-container" style="margin:30px auto;">
+			<div class="popup-content" style="width:750px;height:800px;background:#ffffff;">
+				<div>
+					<div style="padding:10px;"><img src="images/quad_0001.jpg"/></div>
+					<div id="popup_table_container">
+						<table id="popup_pricing_table">
+						</table>
+					</div>
+				</div>
+			</div>
+			</div>
+		</div>
+		</div>
       <footer>
         
       </footer>
 
     </div>
-<script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 
-  ga('create', 'UA-64710043-1', 'auto');
-  ga('send', 'pageview');
-
-</script>
   </body>
 </html>
